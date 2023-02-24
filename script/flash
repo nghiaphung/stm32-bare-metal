@@ -1,0 +1,5 @@
+#!/bin/bash
+
+ST_FLASH=/home/nghia/stlink/bin/st-flash
+
+${ST_FLASH} write $1  0x8000000
