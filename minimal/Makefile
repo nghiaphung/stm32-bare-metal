@@ -2,6 +2,11 @@ PROJECT := minimal
 BUILD_DIR ?= build
 CFLAGS += -nostdlib
 
+HAL_DIR = ../hal_driver
+CMSIS_DIR = ../CMSIS
+
+TARGET = STM32F030x8
+
 SRCS = \
 	startup.c \
 	$(PROJECT).c
@@ -15,11 +20,16 @@ OCD=arduino-openocd
 MKDIR=mkdir
 
 LDFLAGS += \
-	-specs=nano.specs \
+	-mcpu=cortex-m0 \
+	--specs=nosys.specs \
+	-static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group \
 	-Wl,--gc-sections \
 	-Wl,--print-memory-usage \
 	-Wl,-Map=$(BUILD_DIR)/$(PROJECT).map \
+	-lgcc \
 	-T stm32f030r8_flash.ld
+
+ 
 
 CFLAGS += \
 	-mcpu=cortex-m0 \
@@ -29,15 +39,34 @@ CFLAGS += \
 	-std=c11 \
 	-O0 \
 	-fdebug-prefix-map=$(REPO_ROOT)= \
-	-g \
+	-g3 \
+	-c \
 	-ffreestanding \
 	-ffunction-sections \
-	-fdata-sections
+	-Wl,-gc-sections \
+	-fdata-sections \
+	-fstack-usage \
+	-specs=nano.specs \
+	-mfloat-abi=soft \
+	-D$(TARGET)
+
+SRCS += \
+	$(HAL_DIR)/Src/stm32f0xx_hal.c \
+	$(CMSIS_DIR)/Device/ST/STM32F0xx/Source/Templates/system_stm32f0xx.c \
+	$(HAL_DIR)/Src/stm32f0xx_hal_cortex.c \
+	$(HAL_DIR)/Src/stm32f0xx_hal_gpio.c \
+	$(HAL_DIR)/Src/stm32f0xx_hal_rcc.c
+
+INCLUDES += \
+	$(HAL_DIR)/Inc \
+	$(CMSIS_DIR)/Device/ST/STM32F0xx/Include/ \
+	$(CMSIS_DIR)/Include/
 
 CFLAGS += $(foreach i,$(INCLUDES),-I$(i))
 CFLAGS += $(foreach d,$(DEFINES),-D$(d))
 
-OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS))
+OBJ_DIR = $(BUILD_DIR)/objs/
+OBJS = $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRCS))
 
 
 .PHONY: all
@@ -47,8 +76,12 @@ $(BUILD_DIR):
 	@echo "Create build dir"
 	$(NO_ECHO)$(MKDIR) -p $(BUILD_DIR)
 
-$(BUILD_DIR)/%.o: %.c $(BUILD_DIR)
+$(OBJ_DIR):
+	$(NO_ECHO)$(MKDIR) -p $(OBJ_DIR)
+
+$(OBJ_DIR)/%.o: %.c $(OBJ_DIR)
 	@echo "Compiling $<"
+	$(NO_ECHO)$(MKDIR) -p $(dir $@)
 	$(NO_ECHO)$(CC) -c -o $@ $< $(CFLAGS)
 
 $(BUILD_DIR)/$(PROJECT).bin: $(BUILD_DIR)/$(PROJECT).elf $(BUILD_DIR)/$(PROJECT).lst
@@ -61,7 +94,7 @@ $(BUILD_DIR)/$(PROJECT).lst: $(BUILD_DIR)/$(PROJECT).elf $(BUILD_DIR)
 
 $(BUILD_DIR)/$(PROJECT).elf: $(OBJS)
 	@echo "Linking $@"
-	$(NO_ECHO)$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
+	$(NO_ECHO)$(CC) $^ $(LDFLAGS) -o $@
 
 .PHONY: clean
 clean:

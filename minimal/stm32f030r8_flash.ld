@@ -4,7 +4,7 @@ MEMORY
     RAM       (xrw)    : ORIGIN = 0x20000000,     LENGTH = 8K
 }
 
-STACK_SIZE = 0x2000;
+STACK_SIZE = 0x200;
 
 SECTIONS
 {
@@ -27,8 +27,10 @@ SECTIONS
     /* data is initialized variable, copy from flash to ram */
     .data :
     {
+        . = ALIGN(4);
         _sdata = .;    /* create a global symbol at data start */
         *(.data*)
+        . = ALIGN(4);
         _edata = .;     /* create a global symbol at data end */
     } > RAM AT>FLASH
 
